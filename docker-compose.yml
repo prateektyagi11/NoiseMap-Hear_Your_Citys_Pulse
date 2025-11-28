@@ -1,0 +1,40 @@
+version: "3.8"
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    environment:
+      POSTGRES_DB: noisemap
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init_db:/docker-entrypoint-initdb.d/:ro
+
+  api:
+    build: ./api
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://postgres:password@db:5432/noisemap
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api/app:/usr/src/app/app
+      - ./ml:/usr/src/app/ml
+    command: ["sh", "-c", "python /usr/src/app/app/db_init.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
+
+  streamlit:
+    build: ./streamlit_app
+    depends_on:
+      - api
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./streamlit_app/app:/usr/src/streamlit_app/app
+
+volumes:
+  pgdata:
